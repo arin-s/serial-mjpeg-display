@@ -1,13 +1,36 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Vite + TS</title>
-  </head>
-  <body>
-    <div id="app"></div>
-    <script type="module" src="/src/main.ts"></script>
-  </body>
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Serial MJPEG Display</title>
+  <link href="src/style.css" rel="stylesheet">
+  <script type="module" src="/src/main.ts"></script>
+</head>
+<body>
+  <div class="options">
+    <button id="connect">Connect</button>
+    <div>
+      <label for="baudrate">Baud rate:</label>
+      <select id="baudrate">
+        <option value="1000000">1M</option>
+        <option value="2000000">2M</option>
+        <option selected value="3000000">3M</option>
+      </select>
+    </div>
+    <div>
+      <label for="polyfill_checkbox">Use polyfill:</label>
+      <input id="polyfill_checkbox" type="checkbox">
+    </div>
+    <label id="bpsLabel"></label>
+    <label id="fpsLabel"></label>
+    <label id="frameSizeLabel"></label>
+    <label id="keyLabel"></label>
+  </div>
+  <div id="terminal">
+  <canvas id="canvas" width="320" height="200"></canvas>
+    <!-- <img id="fb"> -->
+  </div>
+</body>
+
 </html>
