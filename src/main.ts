@@ -153,7 +153,13 @@ async function paintCanvas(frame: Uint8Array) {
   fpsCounter++;
   frameSizeLabel.innerText = "Frame Size: " + blob.size;
   //fb.src = URL.createObjectURL(blob);
-  const imageBitmap = await createImageBitmap(blob);
+  let imageBitmap: ImageBitmap;
+  try {
+    imageBitmap = await createImageBitmap(blob);
+  } catch (error) {
+    console.error("MALFORMED IMAGE: ", error);
+    return;
+  }
   ctx?.drawImage(imageBitmap, 0, 0, displayCanvas.clientWidth, displayCanvas.clientHeight);
   imageBitmap.close();
   //sendKeyPress();
@@ -187,6 +193,34 @@ function processInput(event: KeyboardEvent) {
   for (let i = 0; i < frame.length; i++)
     frame[i] = keyStateFrame.charCodeAt(i);
   serialWorker.postMessage({msg: MsgType.SERIAL_TX, array: frame});
+}
+
+function cobsEncode(data: Uint8Array): Uint8Array {
+  // Largest possible size for result buffer
+  let buf = new Uint8Array(1 + Math.ceil(data.length * 255 / 254));
+  let dataIndex = 0;
+  let bufIndex = 1; // Set to 1 to leave room for the header byte
+  let linkIndex = 0; // Keeps track of the last link location
+  let linkOffset = 1; // Offset of the next link relative to the previous one
+  while (dataIndex < data.length) {
+    // Zero byte or max link size reached
+    if (data[dataIndex] === 0 || linkOffset === 255) {
+      buf[linkIndex] = linkOffset;
+      linkIndex = bufIndex;
+      linkOffset = 0;
+      if (data[dataIndex] === 0)
+        dataIndex++;
+    }
+    // Non-zero data byte
+    else if (data[dataIndex] !== 0) {
+      buf[bufIndex] = data[dataIndex];
+      dataIndex++;
+    }
+    bufIndex++;
+    linkOffset++;
+  }
+  buf[linkIndex] = linkOffset;
+  return buf;
 }
 
 function cobsDecode(data: Uint8Array): Uint8Array {
