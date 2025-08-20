@@ -31,7 +31,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   ctx = displayCanvas.getContext('2d') as CanvasRenderingContext2D;
   ctx.imageSmoothingEnabled = false;
   window.setInterval(() => {
-    bpsLabel.innerText = 'Bytes/Sec: ' + bpsCounter.toString();
+    bpsLabel.innerText = 'Bits/Sec: ' + bpsCounter.toString();
     bpsCounter = 0;
     fpsLabel.innerText = 'FPS: ' + fpsCounter.toString();
     fpsCounter = 0;
@@ -161,7 +161,7 @@ async function processChunk(inputChunk: Uint8Array) {
 
 async function paintCanvas(frame: Uint8Array) {
   const blob = new Blob([frame], { type: 'image/jpeg' });
-  bpsCounter += blob.size;
+  bpsCounter += blob.size * 8;
   fpsCounter++;
   frameSizeLabel.innerText = "Frame Size: " + blob.size;
   //fb.src = URL.createObjectURL(blob);
