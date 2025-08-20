@@ -107,10 +107,6 @@ let chunkBufferOffset = 0;
 let readIndex = 0;
 // To prevent concurrent function calls
 let mutex = false;
-// Keeps track of SOI offset between calls
-let SOI: number | null = null;
-// Used for pattern matching byte pairs
-let prevByte: number | null;
 // Stores result frame
 let frame: Uint8Array;
 
@@ -122,37 +118,20 @@ async function processChunk(inputChunk: Uint8Array) {
   mutex = true;
   // Append inputChunk to chunkBuffer
   chunkBuffer.set(inputChunk, chunkBufferOffset);
-  // If we're reading from the start
-  if (readIndex === 0) {
-    prevByte = chunkBuffer[0];
-    readIndex = 1;
-  }
-
   // Main loop
   for (let i = readIndex; i < inputChunk.length + chunkBufferOffset; i++) {
-    // console.log(`prevbyte:${prevByte} + ${chunkBuffer[i].toString(16).padStart(2, '0')}`);
-    // find SOI marker
-    if (prevByte === 0xFF && chunkBuffer[i] === 0xD8) {
-      // console.log(`SOI FOUND: ${i - 1}`);
-      SOI = i - 1;
-    }
-    // find EOI marker
-    if (prevByte === 0xFF && chunkBuffer[i] === 0xD9 && SOI !== null) {
-      // console.log(`EOI FOUND: ${i}`);
-      // console.log(`SLICING FROM ${SOI} (0x${chunkBuffer[SOI].toString(16).padStart(2, '0')}) TO ${i + 1} (0x${chunkBuffer[i].toString(16).padStart(2, '0')}) FRAME SIZE: ${frame.length}`);
-      // TODO: slice straight to 0 instead of offset
-      frame = chunkBuffer.slice(SOI, i + 1);
+    // find end of packet marker
+    if (chunkBuffer[i] === 0) {
+      frame = chunkBuffer.slice(0, i + 1);
       const remainder = chunkBuffer.slice(i + 1, chunkBufferOffset + inputChunk.length);
       chunkBuffer.set(remainder, 0);
-      paintCanvas(frame);
+      paintCanvas(cobsDecode(frame));
       // Set variables for next call then return
       chunkBufferOffset = remainder.length;
-      SOI = null;
       readIndex = 0;
       mutex = false;
       return;
     }
-    prevByte = chunkBuffer[i];
   }
   chunkBufferOffset += inputChunk.length;
   readIndex = chunkBufferOffset;
@@ -168,4 +147,34 @@ async function paintCanvas(frame: Uint8Array) {
   const imageBitmap = await createImageBitmap(blob);
   ctx?.drawImage(imageBitmap, 0, 0, displayCanvas.clientWidth, displayCanvas.clientHeight);
   imageBitmap.close();
+}
+function cobsDecode(data: Uint8Array): Uint8Array {
+  let buf = new Uint8Array(data.length);
+  let dataIndex = 1;
+  let bufIndex = 0;
+  let linkOffset = data[0];
+  let linkIndex = 0;
+  while (dataIndex < data.length) {
+    // Link byte
+    if (linkIndex + linkOffset === dataIndex) {
+      // Reached the end, break
+      if (data[dataIndex] === 0)
+        break;
+      // Encoded zero, write
+      if (linkOffset !== 255)
+      {
+        buf[bufIndex] = 0;
+        bufIndex++;
+      }
+      linkIndex = dataIndex;
+      linkOffset = data[dataIndex];
+    }
+    // Non-link byte
+    else {
+      buf[bufIndex] = data[dataIndex];
+      bufIndex++;
+    }
+    dataIndex++;
+  }
+  return buf.subarray(0, bufIndex);
 }
