@@ -3,8 +3,8 @@ export default {
   plugins: [
     basicSsl(),
   ],
+  base: "./",
   build: {
-    base: "dist/",
     target: "ES2020",
   },
   server: {
