@@ -1,4 +1,7 @@
 import {
+  serial as polyfill,
+} from 'web-serial-polyfill';
+import {
   MsgType,
   SerialMessageEvent,
 } from './serial-worker';
@@ -15,13 +18,18 @@ let bpsCounter = 0;
 let fpsCounter = 0;
 let frameSizeLabel: HTMLLabelElement;
 let fb: HTMLImageElement;
+let keyLabel = document.getElementById('keyLabel') as HTMLInputElement;
+let keys: Map<number, boolean> = new Map();
 
 document.addEventListener('DOMContentLoaded', async () => {
   // Setup elements and listeners
   displayCanvas = document.getElementById('canvas') as HTMLCanvasElement;
+  displayCanvas.addEventListener('keydown', processInput);
+  displayCanvas.addEventListener('keyup', processInput)
   connectButton = document.getElementById('connect') as HTMLButtonElement;
   baudRateSelector = document.getElementById('baudrate') as HTMLSelectElement;
   polyfillCheckbox = document.getElementById('polyfill_checkbox') as HTMLInputElement;
+  keyLabel = document.getElementById('keyLabel') as HTMLInputElement;
   let bpsLabel = document.getElementById('bpsLabel') as HTMLLabelElement;
   let fpsLabel = document.getElementById('fpsLabel') as HTMLLabelElement;
   frameSizeLabel = document.getElementById('frameSizeLabel') as HTMLLabelElement;
@@ -51,11 +59,12 @@ async function toggleConnect() {
     serialWorker.postMessage(MsgType.DISCONNECT);
   }
   else {
-    const ports = await navigator.serial.getPorts();
+    const serial = polyfillCheckbox.checked ? polyfill : navigator.serial;
+    const ports = await serial.getPorts();
     for (const port of ports)
       await port.forget();
     try {
-      await navigator.serial.requestPort();
+      await serial.requestPort({});
     }
     catch (e) {
       console.error(e);
@@ -93,7 +102,7 @@ serialWorker.addEventListener('message', async (event: MessageEvent<SerialMessag
       connectButton.textContent = 'Disconnect';
       connectButton.disabled = false;
       break;
-    case MsgType.SERIAL_CHUNK:
+    case MsgType.SERIAL_RX:
       processChunk(event.data.array!);
       break;
   }
@@ -147,7 +156,39 @@ async function paintCanvas(frame: Uint8Array) {
   const imageBitmap = await createImageBitmap(blob);
   ctx?.drawImage(imageBitmap, 0, 0, displayCanvas.clientWidth, displayCanvas.clientHeight);
   imageBitmap.close();
+  //sendKeyPress();
 }
+
+function processInput(event: KeyboardEvent) {
+  event.preventDefault();
+  let pressed: boolean = event.type == "keydown";
+  let code = event.keyCode;
+  if (code >= 'A'.charCodeAt(0) && code <= 'Z'.charCodeAt(0))
+    code += 32;
+  keys.set(code, pressed);
+  // Create frame to be sent
+  let keyStateFrame: string = "[doom,";
+  let mask = 1 << 7;
+  for (let keyPair of keys) {
+    let encodedKey = keyPair[0];
+    if(keyPair[1])
+      encodedKey |= mask;
+    else
+      encodedKey &= ~mask;
+    keyStateFrame += String.fromCharCode(encodedKey);
+  }
+  keyStateFrame += "]";
+  let x: string = "";
+  for (let char of keyStateFrame)
+    x += char.charCodeAt(0) + " ";
+  x += ` length:${keyStateFrame.length}`;
+  keyLabel.textContent = x;
+  let frame = new Uint8Array(keyStateFrame.length);
+  for (let i = 0; i < frame.length; i++)
+    frame[i] = keyStateFrame.charCodeAt(i);
+  serialWorker.postMessage({msg: MsgType.SERIAL_TX, array: frame});
+}
+
 function cobsDecode(data: Uint8Array): Uint8Array {
   let buf = new Uint8Array(data.length);
   let dataIndex = 1;
