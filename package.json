@@ -1,0 +1,8 @@
+{
+  "name": "doombuds-js",
+  "workspaces": ["packages/serial-mjpeg-display", "packages/serial-mjpeg-common"],
+    "scripts": {
+    "client:dev":   "npm run dev -w serial-mjpeg-display",
+    "client:build": "npm run build -w serial-mjpeg-display"
+  }
+}

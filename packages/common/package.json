@@ -1,6 +1,5 @@
 {
-  "name": "serial-mjpeg-display",
-  "description": "View mjpeg streams on your serial port! Also has controls for interactivity.",
+  "name": "common",
   "version": "1.0.0",
   "private": true,
   "license": "Apache-2.0",

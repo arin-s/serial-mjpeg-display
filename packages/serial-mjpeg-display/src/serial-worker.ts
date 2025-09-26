@@ -118,7 +118,7 @@ async function connect() {
         }
       }
       catch (e) {
-        console.error(e.message);
+        console.error((e as Error).message);
       }
       finally {
         closePort();
@@ -148,7 +148,7 @@ async function connect() {
         }
       }
       catch (e) {
-        console.error(e.message);
+        console.error((e as Error).message);
       }
       finally {
         closePort();
