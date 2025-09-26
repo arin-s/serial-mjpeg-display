@@ -134,7 +134,16 @@ async function processChunk(inputChunk: Uint8Array) {
       frame = chunkBuffer.slice(0, i + 1);
       const remainder = chunkBuffer.slice(i + 1, chunkBufferOffset + inputChunk.length);
       chunkBuffer.set(remainder, 0);
-      paintCanvas(cobsDecode(frame));
+      const decoded = cobsDecode(frame);
+      const packetType = decoded[0];
+      const packetData = decoded.slice(1, decoded.length + 2);
+      console.log(packetType);
+      if(packetType === 1)
+        paintCanvas(packetData);
+      if(packetType === 0) {
+        const text = new TextDecoder().decode(packetData);
+        console.log(text);
+      }
       // Set variables for next call then return
       chunkBufferOffset = remainder.length;
       readIndex = 0;
