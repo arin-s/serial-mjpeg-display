@@ -6,6 +6,9 @@ import {
   SerialMessageEvent,
 } from './serial-worker';
 
+import { testFunc } from 'serial-mjpeg-common';
+testFunc();
+
 const serialWorker = new Worker(new URL('serial-worker.ts', import.meta.url), { type: 'module' });
 
 let displayCanvas: HTMLCanvasElement;

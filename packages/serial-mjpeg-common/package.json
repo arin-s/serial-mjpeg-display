@@ -1,5 +1,5 @@
 {
-  "name": "common",
+  "name": "serial-mjpeg-common",
   "version": "1.0.0",
   "private": true,
   "license": "Apache-2.0",
@@ -22,5 +22,6 @@
   },
   "dependencies": {
     "web-serial-polyfill": "^1.0.15"
-  }
+  },
+  "exports": "./src/test.ts"
 }

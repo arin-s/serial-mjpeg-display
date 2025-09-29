@@ -22,6 +22,7 @@
     "vite": "^6.2.5"
   },
   "dependencies": {
-    "web-serial-polyfill": "^1.0.15"
+    "web-serial-polyfill": "^1.0.15",
+    "common": "*"
   }
 }
