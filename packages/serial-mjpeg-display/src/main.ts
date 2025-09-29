@@ -159,8 +159,8 @@ async function processChunk(inputChunk: Uint8Array) {
   mutex = false;
 }
 
-async function paintCanvas(frame: Uint8Array) {
-  const blob = new Blob([frame], { type: 'image/jpeg' });
+async function paintCanvas(frame: Uint8Array<ArrayBuffer>) {
+  const blob = new Blob([frame.buffer], { type: 'image/jpeg' });
   bpsCounter += blob.size * 8;
   fpsCounter++;
   frameSizeLabel.innerText = "Frame Size: " + blob.size;
