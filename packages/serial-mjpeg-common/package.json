@@ -4,24 +4,13 @@
   "private": true,
   "license": "Apache-2.0",
   "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
-    "preview": "vite preview"
-  },
   "devDependencies": {
     "@eslint/js": "^9.24.0",
     "@stylistic/eslint-plugin": "^4.2.0",
-    "@types/w3c-web-serial": "^1.0.8",
-    "@vitejs/plugin-basic-ssl": "^2.0.0",
     "eslint": "^9.24.0",
     "globals": "^16.0.0",
     "typescript": "^5.8.2",
-    "typescript-eslint": "^8.29.0",
-    "vite": "^6.2.5"
+    "typescript-eslint": "^8.29.0"
   },
-  "dependencies": {
-    "web-serial-polyfill": "^1.0.15"
-  },
-  "exports": "./src/test.ts"
+  "exports": "./src/common.ts"
 }
