@@ -6,8 +6,7 @@ import {
   SerialMessageEvent,
 } from './serial-worker';
 
-import { testFunc } from 'serial-mjpeg-common';
-testFunc();
+import { processChunk, PacketType } from 'serial-mjpeg-common';
 
 const serialWorker = new Worker(new URL('serial-worker.ts', import.meta.url), { type: 'module' });
 
@@ -91,6 +90,7 @@ function markDisconnected(): void {
 
 serialWorker.addEventListener('message', async (event: MessageEvent<SerialMessageEvent>) => {
   //console.log(`RECEIVED EVENT: ${event.data.msg}`);
+  let packet: null | { packetType: number; packetData: Uint8Array<ArrayBuffer> };
   switch (event.data.msg) {
     case MsgType.CONNECT_FAILED:
       console.log('Stream fail received');
@@ -106,58 +106,21 @@ serialWorker.addEventListener('message', async (event: MessageEvent<SerialMessag
       connectButton.disabled = false;
       break;
     case MsgType.SERIAL_RX:
-      processChunk(event.data.array!);
+      packet = processChunk(event.data.array!);
+      if (packet === null)
+        break;
+      console.log(`PACKET RECEIVED: ${packet.packetType}`);
+      switch (packet.packetType) {
+        case PacketType.PACKET_LOG:
+          console.log(new TextDecoder().decode(packet.packetData));
+          break;
+        case PacketType.PACKET_VIDEO:
+          paintCanvas(packet.packetData);
+          break;
+      }
       break;
   }
 });
-
-// Stores input chunks, average frame size = 13.5kb
-const chunkBuffer = new Uint8Array(1024 * 100); // 100KB
-// The amount of bytes in chunkBuffer
-let chunkBufferOffset = 0;
-// Keep track of reading index
-let readIndex = 0;
-// To prevent concurrent function calls
-let mutex = false;
-// Stores result frame
-let frame: Uint8Array;
-
-async function processChunk(inputChunk: Uint8Array) {
-  if (mutex) {
-    console.error('inputChunk dropped');
-    return;
-  }
-  mutex = true;
-  // Append inputChunk to chunkBuffer
-  chunkBuffer.set(inputChunk, chunkBufferOffset);
-  // Main loop
-  for (let i = readIndex; i < inputChunk.length + chunkBufferOffset; i++) {
-    // find end of packet marker
-    if (chunkBuffer[i] === 0) {
-      frame = chunkBuffer.slice(0, i + 1);
-      const remainder = chunkBuffer.slice(i + 1, chunkBufferOffset + inputChunk.length);
-      chunkBuffer.set(remainder, 0);
-      const decoded = cobsDecode(frame);
-      const packetType = decoded[0];
-      const packetData = decoded.slice(1, decoded.length + 2);
-      console.log(packetType);
-      if(packetType === 1)
-        paintCanvas(packetData);
-      if(packetType === 0) {
-        const text = new TextDecoder().decode(packetData);
-        console.log(text);
-      }
-      // Set variables for next call then return
-      chunkBufferOffset = remainder.length;
-      readIndex = 0;
-      mutex = false;
-      return;
-    }
-  }
-  chunkBufferOffset += inputChunk.length;
-  readIndex = chunkBufferOffset;
-  mutex = false;
-}
 
 async function paintCanvas(frame: Uint8Array<ArrayBuffer>) {
   const blob = new Blob([frame.buffer], { type: 'image/jpeg' });
@@ -170,6 +133,7 @@ async function paintCanvas(frame: Uint8Array<ArrayBuffer>) {
     imageBitmap = await createImageBitmap(blob);
   } catch (error) {
     console.error("MALFORMED IMAGE: ", error);
+    console.error(`FRAME SIZE: ${frame.length}`);
     return;
   }
   ctx?.drawImage(imageBitmap, 0, 0, displayCanvas.clientWidth, displayCanvas.clientHeight);
@@ -205,63 +169,4 @@ function processInput(event: KeyboardEvent) {
   for (let i = 0; i < frame.length; i++)
     frame[i] = keyStateFrame.charCodeAt(i);
   serialWorker.postMessage({msg: MsgType.SERIAL_TX, array: frame});
-}
-
-function cobsEncode(data: Uint8Array): Uint8Array {
-  // Largest possible size for result buffer
-  let buf = new Uint8Array(1 + Math.ceil(data.length * 255 / 254));
-  let dataIndex = 0;
-  let bufIndex = 1; // Set to 1 to leave room for the header byte
-  let linkIndex = 0; // Keeps track of the last link location
-  let linkOffset = 1; // Offset of the next link relative to the previous one
-  while (dataIndex < data.length) {
-    // Zero byte or max link size reached
-    if (data[dataIndex] === 0 || linkOffset === 255) {
-      buf[linkIndex] = linkOffset;
-      linkIndex = bufIndex;
-      linkOffset = 0;
-      if (data[dataIndex] === 0)
-        dataIndex++;
-    }
-    // Non-zero data byte
-    else if (data[dataIndex] !== 0) {
-      buf[bufIndex] = data[dataIndex];
-      dataIndex++;
-    }
-    bufIndex++;
-    linkOffset++;
-  }
-  buf[linkIndex] = linkOffset;
-  return buf;
-}
-
-function cobsDecode(data: Uint8Array): Uint8Array {
-  let buf = new Uint8Array(data.length);
-  let dataIndex = 1;
-  let bufIndex = 0;
-  let linkOffset = data[0];
-  let linkIndex = 0;
-  while (dataIndex < data.length) {
-    // Link byte
-    if (linkIndex + linkOffset === dataIndex) {
-      // Reached the end, break
-      if (data[dataIndex] === 0)
-        break;
-      // Encoded zero, write
-      if (linkOffset !== 255)
-      {
-        buf[bufIndex] = 0;
-        bufIndex++;
-      }
-      linkIndex = dataIndex;
-      linkOffset = data[dataIndex];
-    }
-    // Non-link byte
-    else {
-      buf[bufIndex] = data[dataIndex];
-      bufIndex++;
-    }
-    dataIndex++;
-  }
-  return buf.subarray(0, bufIndex);
 }
