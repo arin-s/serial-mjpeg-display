@@ -22,7 +22,8 @@
     "vite": "^6.2.5"
   },
   "dependencies": {
-    "web-serial-polyfill": "^1.0.15",
-    "serial-mjpeg-common": "*"
+    "serial-mjpeg-common": "*",
+    "socket.io": "^4.8.1",
+    "web-serial-polyfill": "^1.0.15"
   }
 }
