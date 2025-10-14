@@ -31,7 +31,7 @@ body {
   container-type: size;
 }
 
-#canvas {
+#frameBuffer {
   border: 4px purple solid;
   height: auto;
   aspect-ratio: 320 / 200;

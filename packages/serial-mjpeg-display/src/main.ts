@@ -10,7 +10,7 @@ import { processChunk, PacketType } from 'serial-mjpeg-common';
 
 const serialWorker = new Worker(new URL('serial-worker.ts', import.meta.url), { type: 'module' });
 
-let displayCanvas: HTMLCanvasElement;
+let frameBuffer: HTMLImageElement;
 let connectButton: HTMLButtonElement;
 let baudRateSelector: HTMLSelectElement;
 let polyfillCheckbox: HTMLInputElement;
@@ -19,15 +19,14 @@ let ctx: CanvasRenderingContext2D;
 let bpsCounter = 0;
 let fpsCounter = 0;
 let frameSizeLabel: HTMLLabelElement;
-let fb: HTMLImageElement;
 let keyLabel = document.getElementById('keyLabel') as HTMLInputElement;
 let keys: Map<number, boolean> = new Map();
 
 document.addEventListener('DOMContentLoaded', async () => {
   // Setup elements and listeners
-  displayCanvas = document.getElementById('canvas') as HTMLCanvasElement;
-  displayCanvas.addEventListener('keydown', processInput);
-  displayCanvas.addEventListener('keyup', processInput)
+  frameBuffer = document.getElementById('frameBuffer') as HTMLImageElement;
+  frameBuffer.addEventListener('keydown', processInput);
+  frameBuffer.addEventListener('keyup', processInput)
   connectButton = document.getElementById('connect') as HTMLButtonElement;
   baudRateSelector = document.getElementById('baudrate') as HTMLSelectElement;
   polyfillCheckbox = document.getElementById('polyfill_checkbox') as HTMLInputElement;
@@ -38,8 +37,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   //fb = document.getElementById('fb') as HTMLImageElement;
   // paintButton.addEventListener('click', bufferToCanvas);
   connectButton.addEventListener('click', toggleConnect);
-  ctx = displayCanvas.getContext('2d') as CanvasRenderingContext2D;
-  ctx.imageSmoothingEnabled = false;
   window.setInterval(() => {
     bpsLabel.innerText = 'Bits/Sec: ' + bpsCounter.toString();
     bpsCounter = 0;
@@ -127,18 +124,16 @@ async function paintCanvas(frame: Uint8Array<ArrayBuffer>) {
   bpsCounter += blob.size * 8;
   fpsCounter++;
   frameSizeLabel.innerText = "Frame Size: " + blob.size;
-  //fb.src = URL.createObjectURL(blob);
-  let imageBitmap: ImageBitmap;
   try {
-    imageBitmap = await createImageBitmap(blob);
+    createImageBitmap(blob); // errors if invalid image
+    const url = URL.createObjectURL(blob);
+    frameBuffer.onload = () => { URL.revokeObjectURL(url) };
+    frameBuffer.src = url;
   } catch (error) {
     console.error("MALFORMED IMAGE: ", error);
     console.error(`FRAME SIZE: ${frame.length}`);
     return;
   }
-  ctx?.drawImage(imageBitmap, 0, 0, displayCanvas.clientWidth, displayCanvas.clientHeight);
-  imageBitmap.close();
-  //sendKeyPress();
 }
 
 function processInput(event: KeyboardEvent) {
