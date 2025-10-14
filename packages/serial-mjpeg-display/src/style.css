@@ -27,11 +27,16 @@ body {
   flex: 1 0;
   align-items: center;
   justify-content: center;
+  min-height: 0;
+  container-type: size;
 }
 
-#fb, canvas {
-  border: 1px black solid;
-  transform: scale(2,2);
+#canvas {
+  border: 4px purple solid;
+  height: auto;
+  aspect-ratio: 320 / 200;
+  width: min(100%, 100cqh * 320 / 200);
+  image-rendering: pixelated;
 }
 
 .info {
