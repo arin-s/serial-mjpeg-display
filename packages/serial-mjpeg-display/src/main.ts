@@ -12,7 +12,6 @@ const serialWorker = new Worker(new URL('serial-worker.ts', import.meta.url), { 
 
 let frameBuffer: HTMLImageElement;
 let connectButton: HTMLButtonElement;
-let baudRateSelector: HTMLSelectElement;
 let polyfillCheckbox: HTMLInputElement;
 let connected = false;
 let ctx: CanvasRenderingContext2D;
@@ -28,7 +27,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   frameBuffer.addEventListener('keydown', processInput);
   frameBuffer.addEventListener('keyup', processInput)
   connectButton = document.getElementById('connect') as HTMLButtonElement;
-  baudRateSelector = document.getElementById('baudrate') as HTMLSelectElement;
   polyfillCheckbox = document.getElementById('polyfill_checkbox') as HTMLInputElement;
   keyLabel = document.getElementById('keyLabel') as HTMLInputElement;
   let bpsLabel = document.getElementById('bpsLabel') as HTMLLabelElement;
@@ -71,9 +69,8 @@ async function toggleConnect() {
     }
     connectButton.textContent = 'Connecting...';
     connectButton.disabled = true;
-    baudRateSelector.disabled = true;
     serialWorker.postMessage({ msg: MsgType.CONNECT,
-      startParams: { baudRate: Number.parseInt(baudRateSelector.value),
+      startParams: { baudRate: 3000000,
         usePolyfill: polyfillCheckbox.checked } });
   }
 }
@@ -82,7 +79,6 @@ function markDisconnected(): void {
   connected = true;
   connectButton.textContent = 'Connect';
   connectButton.disabled = false;
-  baudRateSelector.disabled = false;
 }
 
 serialWorker.addEventListener('message', async (event: MessageEvent<SerialMessageEvent>) => {
