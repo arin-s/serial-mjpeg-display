@@ -36,7 +36,7 @@ body {
   height: auto;
   aspect-ratio: 320 / 200;
   width: min(100%, 100cqh * 320 / 200);
-  image-rendering: pixelated;
+  /*image-rendering: pixelated;*/
 }
 
 .info {

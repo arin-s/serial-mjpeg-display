@@ -1,12 +1,7 @@
-import {
-  serial as polyfill,
-} from 'web-serial-polyfill';
-import {
-  MsgType,
-  SerialMessageEvent,
-} from './serial-worker';
-
-import { processChunk, PacketType } from 'serial-mjpeg-common';
+import { serial as polyfill } from 'web-serial-polyfill';
+import { MsgType, SerialMessageEvent } from './serial-worker';
+import { processChunk, PacketType, Packet, ClientToServerEvents, ServerToClientEvents } from 'serial-mjpeg-common';
+import { io, Socket } from 'socket.io-client';
 
 const serialWorker = new Worker(new URL('serial-worker.ts', import.meta.url), { type: 'module' });
 
@@ -14,27 +9,27 @@ let frameBuffer: HTMLImageElement;
 let connectButton: HTMLButtonElement;
 let polyfillCheckbox: HTMLInputElement;
 let connected = false;
-let ctx: CanvasRenderingContext2D;
 let bpsCounter = 0;
 let fpsCounter = 0;
 let frameSizeLabel: HTMLLabelElement;
-let keyLabel = document.getElementById('keyLabel') as HTMLInputElement;
+let keyLabel;
 let keys: Map<number, boolean> = new Map();
+let relay: boolean;
 
 document.addEventListener('DOMContentLoaded', async () => {
-  // Setup elements and listeners
+  // Get elements
   frameBuffer = document.getElementById('frameBuffer') as HTMLImageElement;
-  frameBuffer.addEventListener('keydown', processInput);
-  frameBuffer.addEventListener('keyup', processInput)
   connectButton = document.getElementById('connect') as HTMLButtonElement;
   polyfillCheckbox = document.getElementById('polyfill_checkbox') as HTMLInputElement;
-  keyLabel = document.getElementById('keyLabel') as HTMLInputElement;
+  keyLabel = document.getElementById('keyLabel') as HTMLLabelElement;
   let bpsLabel = document.getElementById('bpsLabel') as HTMLLabelElement;
   let fpsLabel = document.getElementById('fpsLabel') as HTMLLabelElement;
   frameSizeLabel = document.getElementById('frameSizeLabel') as HTMLLabelElement;
-  //fb = document.getElementById('fb') as HTMLImageElement;
-  // paintButton.addEventListener('click', bufferToCanvas);
+  // Setup listeners
   connectButton.addEventListener('click', toggleConnect);
+  frameBuffer.addEventListener('keydown', processInput);
+  frameBuffer.addEventListener('keyup', processInput);
+  // Setup fps/bps tracker
   window.setInterval(() => {
     bpsLabel.innerText = 'Bits/Sec: ' + bpsCounter.toString();
     bpsCounter = 0;
@@ -42,11 +37,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     fpsCounter = 0;
   }, 1000);
 
-  /* document.getElementById('FTDI')?.addEventListener("click", async () => {
-    let FTDI = await window.navigator.usb.requestDevice({filters:[{vendorId:0x0403, productId:0x6011}]});
-    let FTDIPort = new SerialPortPolyfill(FTDI);
-    addNewPort(FTDIPort);
-    console.log(FTDIPort); */
+  // If connecting to a nodejs server 
+  const res = await fetch(document.URL, {method: 'HEAD'});
+  relay = res.headers.has('DOOMBUDS-RELAY');
+  if (relay) {
+    connectButton.disabled = true;
+    const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io();
+    socket.on('decodedPacket', (packet) => {
+      processPacket(packet);
+    });
+  }
 });
 
 async function toggleConnect() {
@@ -83,7 +83,7 @@ function markDisconnected(): void {
 
 serialWorker.addEventListener('message', async (event: MessageEvent<SerialMessageEvent>) => {
   //console.log(`RECEIVED EVENT: ${event.data.msg}`);
-  let packet: null | { packetType: number; packetData: Uint8Array<ArrayBuffer> };
+  let packet: null | Packet;
   switch (event.data.msg) {
     case MsgType.CONNECT_FAILED:
       console.log('Stream fail received');
@@ -100,23 +100,28 @@ serialWorker.addEventListener('message', async (event: MessageEvent<SerialMessag
       break;
     case MsgType.SERIAL_RX:
       packet = processChunk(event.data.array!);
-      if (packet === null)
-        break;
-      console.log(`PACKET RECEIVED: ${packet.packetType}`);
-      switch (packet.packetType) {
-        case PacketType.PACKET_LOG:
-          console.log(new TextDecoder().decode(packet.packetData));
-          break;
-        case PacketType.PACKET_VIDEO:
-          paintCanvas(packet.packetData);
-          break;
-      }
+      processPacket(packet);
       break;
   }
 });
 
-async function paintCanvas(frame: Uint8Array<ArrayBuffer>) {
-  const blob = new Blob([frame.buffer], { type: 'image/jpeg' });
+function processPacket(packet: Packet | null) {
+  if (packet === null)
+    return;
+  console.log(`PACKET RECEIVED: ${packet.packetType}`);
+  switch (packet.packetType) {
+    case PacketType.PACKET_LOG:
+      console.log(new TextDecoder().decode(packet.packetData));
+      break;
+    case PacketType.PACKET_VIDEO:
+      paintCanvas(packet.packetData);
+      break;
+  }
+
+}
+
+async function paintCanvas(frame: ArrayBuffer) {
+  const blob = new Blob([frame], { type: 'image/jpeg' });
   bpsCounter += blob.size * 8;
   fpsCounter++;
   frameSizeLabel.innerText = "Frame Size: " + blob.size;
@@ -127,7 +132,7 @@ async function paintCanvas(frame: Uint8Array<ArrayBuffer>) {
     frameBuffer.src = url;
   } catch (error) {
     console.error("MALFORMED IMAGE: ", error);
-    console.error(`FRAME SIZE: ${frame.length}`);
+    console.error(`FRAME SIZE: ${frame.byteLength}`);
     return;
   }
 }

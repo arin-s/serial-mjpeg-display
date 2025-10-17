@@ -6,8 +6,18 @@ export enum PacketType {
   PACKET_INPUT,
 };
 
+export type Packet = { packetType: PacketType; packetData: ArrayBuffer };
+
+export interface ServerToClientEvents {
+  decodedPacket: (packet: Packet) => void;
+}
+
+export interface ClientToServerEvents {
+  keyState: (keyState: Map<number, boolean>) => void;
+}
+
 // Stores input chunks, average frame size = 13.5kb
-const chunkBuffer = new Uint8Array(1024 * 100); // 100KB
+const chunkBuffer = new Uint8Array(1024 * 1000); // 1000KB
 // The amount of bytes in chunkBuffer
 let chunkBufferOffset = 0;
 // Keep track of reading index
@@ -17,7 +27,7 @@ let mutex = false;
 // Stores result frame
 let frame: Uint8Array;
 
-export function processChunk(inputChunk: Uint8Array): null | { packetType: number; packetData: Uint8Array<ArrayBuffer> } {
+export function processChunk(inputChunk: Uint8Array): null | Packet {
   if (mutex) {
     console.error('inputChunk dropped');
     return;
@@ -39,7 +49,8 @@ export function processChunk(inputChunk: Uint8Array): null | { packetType: numbe
       chunkBufferOffset = remainder.length;
       readIndex = 0;
       mutex = false;
-      return { packetType, packetData };
+      const slicedArray = packetData.buffer.slice(packetData.byteOffset, packetData.byteOffset + packetData.byteLength);
+      return { packetType, packetData: slicedArray };
     }
   }
   chunkBufferOffset += inputChunk.length;

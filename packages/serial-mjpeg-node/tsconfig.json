@@ -8,7 +8,7 @@
     // Treat files as modules even if it doesn't use import/export
 		"moduleDetection": "force",
 		// Ignore module structure
-		"module": "Preserve",
+		"module": "nodenext",
 		// Allow JSON modules to be imported
 		"resolveJsonModule": true,
 		// Allow JS files to be imported from TS and vice versa
