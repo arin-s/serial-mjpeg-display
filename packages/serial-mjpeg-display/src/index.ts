@@ -1,6 +1,6 @@
 import { serial as polyfill } from 'web-serial-polyfill';
 import { MsgType, SerialMessageEvent } from './serial-worker';
-import { processChunk, PacketType, Packet, ClientToServerEvents, ServerToClientEvents } from 'serial-mjpeg-common';
+import { processChunk, PacketType, Packet, ClientToServerEvents, ServerToClientEvents, createKeyPacket } from 'serial-mjpeg-common';
 import { io, Socket } from 'socket.io-client';
 
 const serialWorker = new Worker(new URL('serial-worker.ts', import.meta.url), { type: 'module' });
@@ -15,6 +15,7 @@ let frameSizeLabel: HTMLLabelElement;
 let keyLabel;
 let keys: Map<number, boolean> = new Map();
 let relay: boolean;
+let socket: Socket<ServerToClientEvents, ClientToServerEvents>;
 
 document.addEventListener('DOMContentLoaded', async () => {
   // Get elements
@@ -42,7 +43,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   relay = res.headers.has('DOOMBUDS-RELAY');
   if (relay) {
     connectButton.disabled = true;
-    const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io();
+    socket = io();
     socket.on('decodedPacket', (packet) => {
       processPacket(packet);
     });
@@ -108,7 +109,7 @@ serialWorker.addEventListener('message', async (event: MessageEvent<SerialMessag
 function processPacket(packet: Packet | null) {
   if (packet === null)
     return;
-  console.log(`PACKET RECEIVED: ${packet.packetType}`);
+  //console.log(`PACKET RECEIVED: ${packet.packetType}`);
   switch (packet.packetType) {
     case PacketType.PACKET_LOG:
       console.log(new TextDecoder().decode(packet.packetData));
@@ -144,25 +145,11 @@ function processInput(event: KeyboardEvent) {
   if (code >= 'A'.charCodeAt(0) && code <= 'Z'.charCodeAt(0))
     code += 32;
   keys.set(code, pressed);
-  // Create frame to be sent
-  let keyStateFrame: string = "[doom,";
-  let mask = 1 << 7;
-  for (let keyPair of keys) {
-    let encodedKey = keyPair[0];
-    if(keyPair[1])
-      encodedKey |= mask;
-    else
-      encodedKey &= ~mask;
-    keyStateFrame += String.fromCharCode(encodedKey);
+  const keyStateArray = Array.from(keys, ([key, value]) => ({ key, value }));
+  if (relay)
+    socket.emit('keyState', keyStateArray);
+  else {
+    const keyStatePacket = createKeyPacket(keyStateArray);
+    serialWorker.postMessage({msg: MsgType.SERIAL_TX, array: keyStatePacket});
   }
-  keyStateFrame += "]";
-  let x: string = "";
-  for (let char of keyStateFrame)
-    x += char.charCodeAt(0) + " ";
-  x += ` length:${keyStateFrame.length}`;
-  keyLabel.textContent = x;
-  let frame = new Uint8Array(keyStateFrame.length);
-  for (let i = 0; i < frame.length; i++)
-    frame[i] = keyStateFrame.charCodeAt(i);
-  serialWorker.postMessage({msg: MsgType.SERIAL_TX, array: frame});
 }

@@ -103,7 +103,7 @@ async function connect() {
   (async () => {
     let inc: number = 0;
     setInterval(() => {
-      console.log(`inc` + inc);
+      //console.log(`inc` + inc);
     }, 1000);
     while (port.writable) {
       try {

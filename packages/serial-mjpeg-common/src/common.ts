@@ -13,7 +13,7 @@ export interface ServerToClientEvents {
 }
 
 export interface ClientToServerEvents {
-  keyState: (keyState: Map<number, boolean>) => void;
+  keyState: (keyStateArray: { key: number; value: boolean }[]) => void;
 }
 
 // Stores input chunks, average frame size = 13.5kb
@@ -116,4 +116,21 @@ export function cobsDecode(data: Uint8Array): Uint8Array {
     dataIndex++;
   }
   return buf.subarray(0, bufIndex);
+}
+
+export function createKeyPacket(keyStateArray: { key: number; value: boolean }[]): Uint8Array {
+  let keyStateString: string = "";
+  let mask = 1 << 7;
+  for (let keyPair of keyStateArray) {
+    let encodedKey = keyPair.key;
+    if(keyPair.value)
+      encodedKey |= mask;
+    else
+      encodedKey &= ~mask;
+    keyStateString += String.fromCharCode(encodedKey);
+  }
+  let frame = new Uint8Array(keyStateString.length);
+  for (let i = 0; i < frame.length; i++)
+    frame[i] = keyStateString.charCodeAt(i);
+  return (cobsEncode(frame));
 }

@@ -3,7 +3,7 @@ import fs from 'fs';
 import http from 'http';
 import mime from 'mime-types';
 import { SerialPort } from 'serialport';
-import { ClientToServerEvents, PacketType, processChunk, ServerToClientEvents } from 'serial-mjpeg-common';
+import { ClientToServerEvents, createKeyPacket, PacketType, processChunk, ServerToClientEvents } from 'serial-mjpeg-common';
 
 const HTTP_PORT = 8080;
 let clients = new Map<String, Socket>();
@@ -42,7 +42,9 @@ io.on('connection', (client) => {
   console.log(`Client ${client.id} connected`);
   clients.set(client.id, client);
   // events
-  client.on('keyState', (keyState) => { /* … */ });
+  client.on('keyState', (keyStateArray) => {
+    serialPort.write(createKeyPacket(keyStateArray));
+  });
   client.on('disconnect', (reason) => {
     console.log(`Client ${client.id} disconnected`);
     clients.delete(client.id);
@@ -67,7 +69,7 @@ serialPort.on('data', (chunk: Buffer) => {
     case PacketType.PACKET_VIDEO:
       console.log(`Video Packet Size ${packet.packetData.byteLength}`);
       for (const client of clients.values()) {
-        client.emit('jpeg', packet);
+        client.emit('decodedPacket', packet);
         console.log(`Emitting to client ${client.id}`);
       }
       break;
